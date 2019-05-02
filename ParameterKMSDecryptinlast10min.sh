@@ -1,6 +1,6 @@
 #place script in /usr/local/bin
 #create entry in /etc/crontab
-#*/10 * * * * root /usr/local/bin/GetSecretValueinlast10min.sh
+#*/10 * * * * root /usr/local/bin/ParameterKMSDecryptinlast10min.sh
 
 REGION="us-east-1"
 #what secret/resource name to look for
@@ -10,43 +10,44 @@ yum -y install epel-release
 yum-config-manager --enable epel
 yum -y install jq mutt postfix
 
-#get all GetSecretValue events from the last 10 minutes in the region where my secret resides
+#get all Decrypt events from the last 10 minutes in the region where my secret resides
 nowformatted=$(date "+%s")
 nowminustenminformatted=$(date --date '-10 minutes' "+%s")
-events=$(aws cloudtrail lookup-events --region ${REGION} --lookup-attributes AttributeKey=EventName,AttributeValue=GetSecretValue --start-time ${nowminustenminformatted} --end-time ${nowformatted})
+events=$(aws cloudtrail lookup-events --region ${REGION} --lookup-attributes AttributeKey=EventName,AttributeValue=Decrypt --start-time ${nowminustenminformatted} --end-time ${nowformatted})
 
-#get yesterdays GetSecretValue events for log file
+#get yesterdays Decrypt events for log file
 yesterdaydate=$(date --date '-1 day' "+%D")
 yesterdaylogname=/var/log/$(date +%F --date $yesterdaydate)-Decrypt-Events.log
 if [ ! -f "$yesterdaylogname" ]; then
     yesterday=$(date --date '-1 day' "+%s")
     yesterdayendofday=$(date --date '+24 hours' "+%s")
     #twodaysago=$(date --date '-2 day' "+%D")
-    yesterdaysevents=$(aws cloudtrail lookup-events --region ${REGION} --lookup-attributes AttributeKey=EventName,AttributeValue=GetSecretValue --start-time ${yesterday} --end-time ${yesterdayendofday})
+    yesterdaysevents=$(aws cloudtrail lookup-events --region ${REGION} --lookup-attributes AttributeKey=EventName,AttributeValue=Decrypt --start-time ${yesterday} --end-time ${yesterdayendofday})
     echo $yesterdaysevents >> $yesterdaylogname
 fi
 
 #get number of events
 eventcount=$(jq -r '.Events | length' <<< $events)
-echo "${eventcount} GetSecretValue events occurred in the time period"
+echo "${eventcount} Decrypt events occurred in the time period"
 
 #loop through event index searching for resource name
 emails=0
 for (( c=0; c<$eventcount; c++ ))
 do
-    thiseventresourcename=$(jq -r .Events[$c].Resources[].ResourceName <<< $events)
-    if [ $thiseventresourcename == $resourcename ]
+    thiseventresourcename=$(jq .[] <<< $events | jq -r .[$c].CloudTrailEvent | jq .requestParameters.encryptionContext.PARAMETER_ARN)
+    if [ $thiseventresourcename == *"$resourcename"* ]
     then
         #get event details to send in email
-        thisevent=$(jq -r .Events[$c].CloudTrailEvent <<< $events)
+        thisevent=$(jq .[] <<< $events | jq -r .[$c].CloudTrailEvent)
         #things to send
         __principalId__=$(jq -r .userIdentity.principalId <<< $thisevent)
         __arn__=$(jq -r .userIdentity.arn <<< $thisevent)
         __userIdentity__=$(jq -r .userIdentity <<< $thisevent)
         __eventTime__=$(jq -r .eventTime <<< $thisevent)
         __eventName__=$(jq -r .eventName <<< $thisevent)
+        __PARAMETERARN__=$(jq -r .requestParameters.encryptionContext.PARAMETER_ARN <<< $thisevent)
         #send email
-        echo "Your Secret Value was viewed at ${__eventTime__} by ${__arn__}"
+        echo "Your SSM Parameter Store SecureString Value was viewed at ${__eventTime__} by ${__arn__}"
         cp /usr/local/bin/emailsniporig.html /usr/local/bin/emailsnip$c.html
         #sed -i "s~__principalId__~$__principalId__~g" /usr/local/bin/emailsnip$c.html
         sed -i "s~__arn__~$__arn__~g" /usr/local/bin/emailsnip$c.html
@@ -59,15 +60,13 @@ do
         envirname=$(cat /usr/local/bin/envirname)
         mailtoaddress=$(cat /usr/local/bin/mailtoaddress)
         mailfromdomain=$(cat /usr/local/bin/mailfromdomain)
-        mutt -F /root/.muttrc -e 'set content_type=text/html' -s "Secrets Manager Secret Value was viewed!" $mailtoaddress < /usr/local/bin/fullemail.html
+        mutt -F /root/.muttrc -e 'set content_type=text/html' -s "SSM Parameter Store SecureString Value was viewed!" $mailtoaddress < /usr/local/bin/fullemail.html
         #cleanup
         shred -u /usr/local/bin/fullemail.html
         shred -u /usr/local/bin/emailsnip$c.html
-        email++
+        emails++
     else 
-        echo "GetSecretValue event ${c} did not relate to ${resourcename}"
+        echo "Decrypt event ${c} did not relate to ${resourcename}"
     fi
 done
-echo "There were ${emails} GetSecretValue events relating to ${resourcename} in the time period"
-
-
+echo "There were ${emails} Decrypt events relating to ${resourcename} in the time period"

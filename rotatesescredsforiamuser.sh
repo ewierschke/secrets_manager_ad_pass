@@ -171,9 +171,10 @@ then
   do 
     thiskey=$(jq -r .AccessKeyMetadata[$c] <<< $currentkeys)
     thiskeystatus=$(jq -r .AccessKeyMetadata[$c].Status <<< $currentkeys)
+    thiskeydate=$(jq -r .AccessKeyMetadata[$c].CreateDate <<< $currentkeys)
     if [ $thiskeystatus == $inactivestatus ]
     then
-      log "One key is inactive, deleting inactive key..."
+      log "One key is inactive, deleting inactive key (Created: ${thiskeydate})..."
       #delete inactive key
       thiskeyid=$(jq -r .AccessKeyId <<< $thiskey)
       aws iam delete-access-key --user-name $IAM_USERNAME --access-key-id $thiskeyid

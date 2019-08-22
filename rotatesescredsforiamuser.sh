@@ -252,7 +252,7 @@ then
     log "Make old access key inactive..."
     aws iam update-access-key --user-name $IAM_USERNAME --access-key-id $existingkeyid --status $inactivestatus
   else 
-    log "SES credential problem"
+    die "SES credential problem - mail stuck in queue"
   fi
   log "Created new key..."
 fi 

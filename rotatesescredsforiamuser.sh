@@ -147,7 +147,7 @@ log "Create sasl_passwd_template"
 log "Create mutt config"
 (
   printf "set realname=\"$MAIL_FROM_DOMAIN SES Rotate Script\"\n"
-  printf "set from=\"sesrotate@'$MAIL_FROM_DOMAIN'\"\n"
+  printf "set from=\"sesrotate@$MAIL_FROM_DOMAIN\"\n"
   printf "set use_from = yes\n"
   printf "set edit_headers = yes\n"
   printf "set use_envelope_from = yes\n"
@@ -233,6 +233,7 @@ then
   #use new creds
   log "Use new sasl_passwd..."
   /sbin/postmap /etc/postfix/sasl_passwd
+  service postfix restart
   #add instance id and ses iam username to email
   log "Get ec2 instance id..."
   ec2id="`wget -q -O - http://169.254.169.254/latest/meta-data/instance-id || die \"wget instance-id has failed: $?\"`"

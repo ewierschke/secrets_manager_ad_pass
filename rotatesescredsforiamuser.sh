@@ -145,11 +145,13 @@ log "Create sasl_passwd_template"
 
 #create .muttsesrotaterc
 log "Create mutt config"
-echo 'set realname="SES Rotate"' >> /root/.muttsesrotaterc
-echo 'set from="sesrotate@'$MAIL_FROM_DOMAIN'"' >> /root/.muttsesrotaterc
-echo 'set use_from = yes' >> /root/.muttsesrotaterc
-echo 'set edit_headers = yes' >> /root/.muttsesrotaterc
-echo 'set use_envelope_from = yes' >> /root/.muttsesrotaterc
+(
+  printf "set realname=\"$MAIL_FROM_DOMAIN SES Rotate Script\"\n"
+  printf "set from=\"sesrotate@'$MAIL_FROM_DOMAIN'\"\n"
+  printf "set use_from = yes\n"
+  printf "set edit_headers = yes\n"
+  printf "set use_envelope_from = yes\n"
+) > /root/.muttsesrotaterc
 
 #create sescredrotatedemail
 log "Create admin email template"
@@ -190,11 +192,11 @@ then
     key1dateseconds=$(date -d $key1date +"%s")
     if [ $key0dateseconds -lt $key1dateseconds ]
     then
-      log "key0 is older than key1, deleting key0..."
+      log "key0 (Created: ${key0date}) is older than key1 (Created: ${key1date}), deleting key0..."
       key0id=$(jq -r .AccessKeyMetadata[0].AccessKeyId <<< $currentkeys)
       aws iam delete-access-key --user-name $IAM_USERNAME --access-key-id $key0id
     else 
-      log "key1 is older than key0, deleting key1..."
+      log "key1 (Created: ${key1date}) is older than key0 (Created: ${key1date}), deleting key1..."
       key1id=$(jq -r .AccessKeyMetadata[1].AccessKeyId <<< $currentkeys)
       aws iam delete-access-key --user-name $IAM_USERNAME --access-key-id $key1id
     fi
@@ -228,7 +230,7 @@ then
   nowcomment="#Modified ${now}"
   echo $nowcomment >> /etc/postfix/sasl_passwd
   #use new creds
-  log "Use new sasl_passwd"
+  log "Use new sasl_passwd..."
   /sbin/postmap /etc/postfix/sasl_passwd
   #add instance id and ses iam username to email
   log "Get ec2 instance id..."

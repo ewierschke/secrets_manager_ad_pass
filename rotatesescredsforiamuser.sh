@@ -76,9 +76,7 @@ log "Begin execution of ses rotate script on ${HOSTNAME}"
 
 yum -y install epel-release
 yum-config-manager --enable epel
-if ! yum list installed jq mutt postfix ; then
-  yum -y install jq mutt postfix wget
-fi
+yum -y install jq mutt postfix wget
 
 #create python to create smtp password from access key secret
 log "Create python script"
@@ -249,10 +247,12 @@ then
   #send test email to admin
   log "Send admin email using new creds..."
   mutt -F /root/.muttsesrotaterc -e 'set content_type=text/html' -s "SES Credential Rotated" $ADMIN_EMAIL_ADDRESS < /usr/local/bin/sescredrotatedemail.html
-  if [[ $? -eq 0 ]]
+  if [[ $(mailq | grep -c "^[A-F0-9]") -eq 0 ]]
   then 
     log "Make old access key inactive..."
     aws iam update-access-key --user-name $IAM_USERNAME --access-key-id $existingkeyid --status $inactivestatus
+  else 
+    log "SES credential problem"
   fi
   log "Created new key..."
 fi 

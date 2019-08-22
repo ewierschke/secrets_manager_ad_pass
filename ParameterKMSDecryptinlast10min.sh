@@ -8,9 +8,7 @@ resourcename="my/secret/name"
 
 yum -y install epel-release
 yum-config-manager --enable epel
-if ! yum list installed jq mutt postfix ; then
-  yum -y install jq mutt postfix
-fi
+yum -y install jq mutt postfix
 
 #get all Decrypt events from the last 10 minutes in the region where my secret resides
 nowformatted=$(date "+%s")

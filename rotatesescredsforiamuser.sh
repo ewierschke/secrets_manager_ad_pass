@@ -1,14 +1,76 @@
 #/bin/bash
 # This script attempts to create a new access key for use with SES in postfix
-
-username=<username>
-adminmailtoaddress=<adminemail>
+__SCRIPTNAME="rotatesescredsforiamuser.sh"
 
 log()
 {
   echo \[$(date +%d%m%Y-%H:%M:%S)\] "$1"
   echo \[$(date +%d%m%Y-%H:%M:%S)\] "$1" >> /var/log/rotatesescredsforiamuser.log
-}
+}  # ----------  end of function log  ----------
+
+die()
+{
+    [ -n "$1" ] && log "$1"
+    log "${__SCRIPTNAME} failed"'!'
+    exit 1
+}  # ----------  end of function die  ----------
+
+usage()
+{
+    cat << EOT
+  Usage:  ${__SCRIPTNAME} [options]
+  Note:
+  Script to create new IAM account access key and smtp password for SES.
+  Assumes postfix has been previously configured and will be used for sending email via SES.
+  Options:
+  -h  Display this message.
+  -A  Email address of the admin to which to send successful rotation email.
+  -D  Domain from which to send successful rotation email.
+  -U  IAM Username used for sending email via SES, access keys will be rotated.
+EOT
+}  # ----------  end of function usage  ----------
+
+# Parse command-line parameters
+while getopts :hA:D:U: opt
+do
+    case "${opt}" in
+        h)
+            usage
+            exit 0
+            ;;
+        A)
+            ADMIN_EMAIL_ADDRESS="${OPTARG}"
+            ;;
+        D)
+            MAIL_FROM_DOMAIN="${OPTARG}"
+            ;;
+        U)
+            IAM_USERNAME="${OPTARG}"
+            ;;
+        \?)
+            usage
+            echo "ERROR: unknown parameter \"$OPTARG\""
+            exit 1
+            ;;
+    esac
+done
+shift $((OPTIND-1))
+
+# Validate parameters
+if [ -z "${ADMIN_EMAIL_ADDRESS}" ]
+then
+  die "Admin Email Address (-A) was not provided; exiting"
+fi
+
+if [ -z "${MAIL_FROM_DOMAIN}" ]
+then
+  die "Domain from which to send successful email (-D) was not provided; exiting"
+fi
+
+if [ -z "${IAM_USERNAME}" ]
+then
+  die "IAM Username (-U) was not provided; exiting"
+fi
 
 log "Begin execution of ses rotate script on ${HOSTNAME}"
 
@@ -84,8 +146,7 @@ log "Create sasl_passwd_template"
 #create .muttsesrotaterc
 log "Create mutt config"
 echo 'set realname="SES Rotate"' >> /root/.muttsesrotaterc
-mailfromdomain=$(cat /usr/local/bin/mailfromdomain)
-echo 'set from="sesrotate@'$mailfromdomain'"' >> /root/.muttsesrotaterc
+echo 'set from="sesrotate@'$MAIL_FROM_DOMAIN'"' >> /root/.muttsesrotaterc
 echo 'set use_from = yes' >> /root/.muttsesrotaterc
 echo 'set edit_headers = yes' >> /root/.muttsesrotaterc
 echo 'set use_envelope_from = yes' >> /root/.muttsesrotaterc
@@ -96,11 +157,11 @@ echo '<html><head></head><body>IAM access keys used for SES sending have been su
 
 log "Get current access keys"
 inactivestatus=Inactive
-currentkeys=$(aws iam list-access-keys --user-name $username)
+currentkeys=$(aws iam list-access-keys --user-name $IAM_USERNAME)
 #check key count
 keycount=$(jq -r '.AccessKeyMetadata | length' <<< $currentkeys)
 #if 2 keys exist for user, delete inactive or oldest key
-log "${username} currently has ${keycount} access keys"
+log "${IAM_USERNAME} currently has ${keycount} access keys"
 if [ $keycount == 2 ]
 then
   #find and delete inactive key
@@ -113,10 +174,10 @@ then
       log "One key is inactive, deleting inactive key..."
       #delete inactive key
       thiskeyid=$(jq -r .AccessKeyId <<< $thiskey)
-      aws iam delete-access-key --user-name $username --access-key-id $thiskeyid
+      aws iam delete-access-key --user-name $IAM_USERNAME --access-key-id $thiskeyid
     fi
   done
-  currentkeys=$(aws iam list-access-keys --user-name $username)
+  currentkeys=$(aws iam list-access-keys --user-name $IAM_USERNAME)
   keycount=$(jq -r '.AccessKeyMetadata | length' <<< $currentkeys)
   if [ $keycount == 2 ]
   #since previous check didn't reduce keycount to 1, both keys are set to active
@@ -131,25 +192,25 @@ then
     then
       log "key0 is older than key1, deleting key0..."
       key0id=$(jq -r .AccessKeyMetadata[0].AccessKeyId <<< $currentkeys)
-      aws iam delete-access-key --user-name $username --access-key-id $key0id
+      aws iam delete-access-key --user-name $IAM_USERNAME --access-key-id $key0id
     else 
       log "key1 is older than key0, deleting key1..."
       key1id=$(jq -r .AccessKeyMetadata[1].AccessKeyId <<< $currentkeys)
-      aws iam delete-access-key --user-name $username --access-key-id $key1id
+      aws iam delete-access-key --user-name $IAM_USERNAME --access-key-id $key1id
     fi
   fi
 fi
 #check key count again just for verification
-currentkeys=$(aws iam list-access-keys --user-name $username)
+currentkeys=$(aws iam list-access-keys --user-name $IAM_USERNAME)
 keycount=$(jq -r '.AccessKeyMetadata | length' <<< $currentkeys)
 #creat new key, new sasl_passwd contents, send test email, and set old key to inactive
 if [ $keycount -lt 2 ]
 then 
   log "Less than 2 access keys, creating new key..."
-  existingkey=$(aws iam list-access-keys --user-name $username)
+  existingkey=$(aws iam list-access-keys --user-name $IAM_USERNAME)
   existingkeyid=$(jq -r .AccessKeyMetadata[0].AccessKeyId <<< $existingkey)
   #create new key and secret
-  newkey=$(aws iam create-access-key --user-name $username)
+  newkey=$(aws iam create-access-key --user-name $IAM_USERNAME)
   newkeyid=$(jq -r .AccessKey.AccessKeyId <<< $newkey)
   newkeysecret=$(jq -r .AccessKey.SecretAccessKey <<< $newkey)
   #create smtp password from secret
@@ -164,7 +225,7 @@ then
     -e "s|__SMTPPASSWORD__|$SMTP_PASSWORD|" \
   /etc/postfix/sasl_passwd
   now=$(date -d "today" +"%Y.%m.%d %H:%M:%S")
-  nowcomment="# ${now}"
+  nowcomment="#Modified ${now}"
   echo $nowcomment >> /etc/postfix/sasl_passwd
   #use new creds
   log "Use new sasl_passwd"
@@ -174,16 +235,16 @@ then
   ec2id="`wget -q -O - http://169.254.169.254/latest/meta-data/instance-id || die \"wget instance-id has failed: $?\"`"
   log "Adjust email template..."
   /usr/bin/sed -i \
-    -e "s|__IAMUSERNAME__|$username|" \
+    -e "s|__IAMUSERNAME__|$IAM_USERNAME|" \
     -e "s|__EC2ID__|$ec2id|" \
   /usr/local/bin/sescredrotatedemail.html
   #send test email to admin
   log "Send admin email using new creds..."
-  mutt -F /root/.muttsesrotaterc -e 'set content_type=text/html' -s "SES Credential Rotated" $adminmailtoaddress < /usr/local/bin/sescredrotatedemail.html
+  mutt -F /root/.muttsesrotaterc -e 'set content_type=text/html' -s "SES Credential Rotated" $ADMIN_EMAIL_ADDRESS < /usr/local/bin/sescredrotatedemail.html
   if [[ $? -eq 0 ]]
   then 
     log "Make old access key inactive..."
-    aws iam update-access-key --user-name $username --access-key-id $existingkeyid --status $inactivestatus
+    aws iam update-access-key --user-name $IAM_USERNAME --access-key-id $existingkeyid --status $inactivestatus
   fi
   log "Created new key..."
 fi 

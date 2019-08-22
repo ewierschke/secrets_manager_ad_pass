@@ -8,7 +8,9 @@ resourcename="my/secret/name"
 
 yum -y install epel-release
 yum-config-manager --enable epel
-yum -y install jq mutt postfix
+if ! yum list installed jq mutt postfix ; then
+  yum -y install jq mutt postfix
+fi
 
 #get all Decrypt events from the last 10 minutes in the region where my secret resides
 nowformatted=$(date "+%s")
@@ -48,7 +50,7 @@ do
         __PARAMETERARN__=$(jq -r .requestParameters.encryptionContext.PARAMETER_ARN <<< $thisevent)
         #send email
         echo "Your SSM Parameter Store SecureString Value was viewed at ${__eventTime__} by ${__arn__}"
-        cp /usr/local/bin/emailsniporig.html /usr/local/bin/emailsnip$c.html
+        cp /usr/local/bin/emailsniporigssmparam.html /usr/local/bin/emailsnip$c.html
         #sed -i "s~__principalId__~$__principalId__~g" /usr/local/bin/emailsnip$c.html
         sed -i "s~__arn__~$__arn__~g" /usr/local/bin/emailsnip$c.html
         #sed -i "s~__userIdentity__~$__userIdentity__~g" /usr/local/bin/emailsnip$c.html

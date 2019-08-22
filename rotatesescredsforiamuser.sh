@@ -1,8 +1,8 @@
 #/bin/bash
 # This script attempts to create a new access key for use with SES in postfix
 
-username=ses-smtp-user.rotatetesting
-adminmailtoaddress=erik.wierschke@plus3it.com
+username=<username>
+adminmailtoaddress=<adminemail>
 
 log()
 {

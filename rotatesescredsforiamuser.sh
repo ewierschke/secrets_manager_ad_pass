@@ -134,12 +134,12 @@ log "Create python script"
 log "Create sasl_passwd_template"
 (
   printf "# SES us-east-1\n"
-  printf "[email-smtp.us-east-1.amazonaws.com]:25 __AKID__:__SMTPPASSWORD__\n"
-  printf "[email-smtp.us-east-1.amazonaws.com]:587 __AKID__:__SMTPPASSWORD__\n"
+  printf "[email-smtp.us-east-1.amazonaws.com]:25 __AKID__:__US_EAST_1_SMTPPASSWORD__\n"
+  printf "[email-smtp.us-east-1.amazonaws.com]:587 __AKID__:__US_EAST_1_SMTPPASSWORD__\n"
   printf "\n"
   printf "# SES us-west-2\n"
-  printf "[email-smtp.us-west-2.amazonaws.com]:25 __AKID__:__SMTPPASSWORD__\n"
-  printf "[email-smtp.us-west-2.amazonaws.com]:587 __AKID__:__SMTPPASSWORD__\n"
+  printf "[email-smtp.us-west-2.amazonaws.com]:25 __AKID__:__US_WEST_2_SMTPPASSWORD__\n"
+  printf "[email-smtp.us-west-2.amazonaws.com]:587 __AKID__:__US_WEST_2_SMTPPASSWORD__\n"
   printf "\n"
 ) > /usr/local/bin/sasl_passwd_template
 
@@ -218,14 +218,16 @@ then
   newkeysecret=$(jq -r .AccessKey.SecretAccessKey <<< $newkey)
   #create smtp password from secret
   log "Converting secret to smtp_password..."
-  SMTP_PASSWORD=$(python3 /usr/local/bin/key2smtppass.py --secret $newkeysecret --region us-east-1)
+  US_EAST_1_SMTP_PASSWORD=$(python3 /usr/local/bin/key2smtppass.py --secret $newkeysecret --region us-east-1)
+  US_WEST_2_SMTP_PASSWORD=$(python3 /usr/local/bin/key2smtppass.py --secret $newkeysecret --region us-west-2)
   #copy sasl_passwd template and adjust contents
   log "Copy sasl_passwd_template..."
   cp -rf /usr/local/bin/sasl_passwd_template /etc/postfix/sasl_passwd
   log "Adjust new sasl_passwd..."
   /usr/bin/sed -i \
     -e "s|__AKID__|$newkeyid|" \
-    -e "s|__SMTPPASSWORD__|$SMTP_PASSWORD|" \
+    -e "s|__US_EAST_1_SMTPPASSWORD__|$US_EAST_1_SMTP_PASSWORD|" \
+    -e "s|__US_WEST_2_SMTPPASSWORD__|$US_WEST_2_SMTP_PASSWORD|" \
   /etc/postfix/sasl_passwd
   now=$(date -d "today" +"%Y.%m.%d %H:%M:%S")
   nowcomment="#Modified ${now}"

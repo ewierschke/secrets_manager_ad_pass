@@ -236,6 +236,8 @@ then
   log "Use new sasl_passwd..."
   /sbin/postmap /etc/postfix/sasl_passwd
   service postfix restart
+  log "Sleep for 10s... (test, initial email w/o sleep w new creds failed)"
+  sleep 10
   #add instance id and ses iam username to email
   log "Get ec2 instance id..."
   ec2id="`wget -q -O - http://169.254.169.254/latest/meta-data/instance-id || die \"wget instance-id has failed: $?\"`"

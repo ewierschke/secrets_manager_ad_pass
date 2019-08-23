@@ -158,6 +158,10 @@ echo '<html><head></head><body>IAM access keys used for SES sending have been su
 log "Get current access keys"
 inactivestatus=Inactive
 currentkeys=$(aws iam list-access-keys --user-name $IAM_USERNAME)
+if [ $? -ne 0 ]
+then
+      die "Unable to query for IAM user access keys"
+fi
 #check key count
 keycount=$(jq -r '.AccessKeyMetadata | length' <<< $currentkeys)
 #if 2 keys exist for user, delete inactive or oldest key

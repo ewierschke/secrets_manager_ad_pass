@@ -76,7 +76,7 @@ log "Begin execution of ses rotate script on ${HOSTNAME}"
 
 yum -y install epel-release
 yum-config-manager --enable epel
-yum -y install jq mutt postfix wget
+yum -y install jq mutt postfix wget cyrus-sasl-plain
 
 #create python to create smtp password from access key secret
 log "Create python script"
@@ -238,6 +238,7 @@ then
   log "Use new sasl_passwd..."
   /sbin/postmap /etc/postfix/sasl_passwd
   service postfix restart
+  /sbin/postmap /etc/postfix/sasl_passwd
   log "Sleep for 10s... (test, initial email w/o sleep w new creds failed)"
   sleep 10
   #add instance id and ses iam username to email
@@ -251,6 +252,7 @@ then
   #send test email to admin
   log "Send admin email using new creds..."
   mutt -F /root/.muttsesrotaterc -e 'set content_type=text/html' -s "SES Credential Rotated" $ADMIN_EMAIL_ADDRESS < /usr/local/bin/sescredrotatedemail.html
+  sleep 5
   if [[ $(mailq | grep -c "^[A-F0-9]") -eq 0 ]]
   then 
     log "Make old access key inactive..."

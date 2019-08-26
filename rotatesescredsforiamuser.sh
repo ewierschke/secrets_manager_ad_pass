@@ -234,6 +234,7 @@ then
   now=$(date -d "today" +"%Y.%m.%d %H:%M:%S")
   nowcomment="#Modified ${now}"
   echo $nowcomment >> /etc/postfix/sasl_passwd
+  chmod 600 /etc/postfix/sasl_passwd
   #use new creds
   log "Use new sasl_passwd..."
   service postfix restart

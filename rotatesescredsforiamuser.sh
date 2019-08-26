@@ -153,7 +153,7 @@ log "Create mutt config"
 
 #create sescredrotatedemail
 log "Create admin email template"
-echo '<html><head></head><body>IAM access keys used for SES sending have been successfully rotated: <br><br>IAM Username: __IAMUSERNAME__, EC2 Instance ID: __EC2ID__, <br><br><br></body></html>' > /usr/local/bin/sescredrotatedemail.html
+echo '<html><head></head><body>IAM access keys used for SES sending have been successfully rotated: <br><br>IAM Username: __IAMUSERNAME__, rotated on EC2 Instance ID: __EC2ID__, <br><br><br></body></html>' > /usr/local/bin/sescredrotatedemail.html
 
 log "Get current access keys"
 inactivestatus=Inactive

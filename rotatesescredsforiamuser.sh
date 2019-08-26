@@ -236,7 +236,6 @@ then
   echo $nowcomment >> /etc/postfix/sasl_passwd
   #use new creds
   log "Use new sasl_passwd..."
-  /sbin/postmap /etc/postfix/sasl_passwd
   service postfix restart
   /sbin/postmap /etc/postfix/sasl_passwd
   log "Sleep for 10s... (test, initial email w/o sleep w new creds failed)"
@@ -255,7 +254,7 @@ then
   sleep 5
   if [[ $(mailq | grep -c "^[A-F0-9]") -eq 0 ]]
   then 
-    log "Make old access key inactive..."
+    log "Mail queue empty, Test email sent, Make old access key inactive..."
     aws iam update-access-key --user-name $IAM_USERNAME --access-key-id $existingkeyid --status $inactivestatus
   else 
     die "SES credential problem - mail stuck in queue"

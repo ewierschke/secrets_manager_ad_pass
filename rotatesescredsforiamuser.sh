@@ -258,7 +258,18 @@ then
     log "Mail queue empty, Test email sent, Make old access key inactive..."
     aws iam update-access-key --user-name $IAM_USERNAME --access-key-id $existingkeyid --status $inactivestatus
   else 
-    die "SES credential problem - mail stuck in queue"
+    log "Mail in queue, retry postmap..."
+    /sbin/postmap /etc/postfix/sasl_passwd
+    log "sleep..."
+    sleep 5
+    log "flush queue..."
+    postqueue -f
+    log "sleep..."
+    sleep 5
+    if [[ $(mailq | grep -c "^[A-F0-9]") -gt 0 ]]
+    then
+      die "SES credential problem - mail stuck in queue"
+    fi
   fi
   log "Created new key..."
 fi 
